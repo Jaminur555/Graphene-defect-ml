@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+
+# pip editable install artifacts
+build/
+dist/
+
+# environments
+.venv/
+venv/
+
+# OS / editor cruft
+.DS_Store
+.vscode/
