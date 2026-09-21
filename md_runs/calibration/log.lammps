@@ -1,0 +1,118 @@
+LAMMPS (22 Jul 2025 - Update 5)
+  using 4 OpenMP thread(s) per MPI task
+# Calibration: unclampe energy minimization with in-plane box relaxation.
+# Purpose: find this poetential's true equilibrium bond length / box size.
+
+units metal
+dimension 3
+boundary p f p
+atom_style molecular
+read_data sheet.data
+Reading data file ...
+  orthogonal box = (1.1975 -12.5 -7.91506) to (71.1975 12.5 62.08494)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  966 atoms
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0       
+     0 = max # of 1-2 neighbors
+     0 = max # of 1-3 neighbors
+     0 = max # of 1-4 neighbors
+     1 = max # of special neighbors
+  special bonds CPU = 0.000 seconds
+  read_data CPU = 0.010 seconds
+
+pair_style airebo 2.0
+pair_coeff * * CH_modified.airebo C
+Reading airebo potential file CH_modified.airebo with DATE: 2011-10-25
+
+
+thermo 50
+thermo_style custom step pe press lx lz
+
+fix relax all box/relax x 0.0 z 0.0 vmax 0.001
+
+min_style cg
+minimize 1.0e-10 1.0e-10 10000 100000
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 9.816371
+  ghost atom cutoff = 9.816371
+  binsize = 4.9081855, bins = 15 6 15
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair airebo, perpetual
+      attributes: full, newton on, ghost
+      pair build: full/bin/ghost
+      stencil: full/ghost/bin/3d
+      bin: standard
+WARNING: Energy due to 3 extra global DOFs will be included in minimizer energies
+ (src/min.cpp:224)
+Per MPI rank memory allocation (min/avg/max) = 12.01 | 12.01 | 12.01 Mbytes
+   Step         PotEng         Press            Lx             Lz      
+         0  -6945.7205      3452.8389      70             70           
+        50  -6950.7214      5.4666295      70.348796      70.631611    
+       100  -6950.974       18.34228       70.379318      70.655779    
+       150  -6951.0609      12.060819      70.389333      70.654125    
+       200  -6951.1307      6.5891424      70.397609      70.652597    
+       250  -6951.2281     -0.67278342     70.400171      70.651913    
+       300  -6951.24       -3.7723299      70.397756      70.651848    
+       350  -6951.2411      1.3471784      70.397063      70.649979    
+       400  -6951.2422     -4.2203702      70.397772      70.650366    
+       450  -6951.2442      3.0000205      70.400433      70.642988    
+       500  -6951.2451     -1.4211772      70.40466       70.643697    
+       550  -6951.2456     -0.33420398     70.404149      70.642095    
+       600  -6951.246       0.98094529     70.404227      70.639937    
+       650  -6951.2463     -0.35053066     70.403339      70.639704    
+       700  -6951.2464      0.48301765     70.404038      70.639681    
+       750  -6951.2466     -0.53814563     70.403592      70.640345    
+       800  -6951.2468      1.5140765      70.403011      70.639808    
+       850  -6951.2469     -1.1678335      70.403394      70.6409      
+       900  -6951.2471      0.47671521     70.402939      70.642296    
+       950  -6951.2474      1.1844903      70.404108      70.644031    
+      1000  -6951.2476      0.323685       70.404483      70.645783    
+      1044  -6951.2495     -0.63078841     70.403765      70.645276    
+Loop time of 9.64638 on 4 procs for 1044 steps with 966 atoms
+
+399.8% CPU use with 1 MPI tasks x 4 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+     -6945.72053055566  -6951.24954513772  -6951.24954555469
+  Force two-norm initial, final = 570.92339 0.15559104
+  Force max component initial, final = 473.48272 0.09311232
+  Final line search alpha, max atom move = 0.0089923094 0.00083729479
+  Iterations, force evaluations = 1044 2074
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 9.5702     | 9.5702     | 9.5702     |   0.0 | 99.21
+Bond    | 0.00017313 | 0.00017313 | 0.00017313 |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.0016725  | 0.0016725  | 0.0016725  |   0.0 |  0.02
+Output  | 0.00053904 | 0.00053904 | 0.00053904 |   0.0 |  0.01
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.07375    |            |       |  0.76
+
+Nlocal:            966 ave         966 max         966 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:             84 ave          84 max          84 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:        99018 ave       99018 max       99018 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 99018
+Ave neighs/atom = 102.50311
+Ave special neighs/atom = 0
+Neighbor list builds = 0
+Dangerous builds = 0
+
+print "Final box: lx = $(lx) lz = $(lz) press = $(press)"
+Final box: lx = 70.403765007915609431 lz = 70.645276442391775618 press = -0.63078841499033933005
+write_dump all custom relaxed.lammpstrj id x y z
+Total wall time: 0:00:09

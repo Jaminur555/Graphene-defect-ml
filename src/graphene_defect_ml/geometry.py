@@ -1,7 +1,7 @@
 import numpy as np
 from ase.build import graphene_nanoribbon
 
-BOND_LENGTH = 1.42     # Angstrom, C-C bond length in graphene
+BOND_LENGTH = 1.3992    # Angstrom, C-C bond length in graphene
 
 
 def build_graphene_sheet(n: int = 21, m: int = 23, row_border: int = 4) -> dict:

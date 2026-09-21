@@ -1,0 +1,23 @@
+# Calibration: unclampe energy minimization with in-plane box relaxation.
+# Purpose: find this poetential's true equilibrium bond length / box size.
+
+units metal
+dimension 3
+boundary p f p 
+atom_style molecular
+read_data sheet.data
+
+pair_style airebo 2.0
+pair_coeff * * CH_modified.airebo C
+
+
+thermo 50 
+thermo_style custom step pe press lx lz
+
+fix relax all box/relax x 0.0 z 0.0 vmax 0.001
+
+min_style cg
+minimize 1.0e-10 1.0e-10 10000 100000
+
+print "Final box: lx = $(lx) lz = $(lz) press = $(press)"
+write_dump all custom relaxed.lammpstrj id x y z

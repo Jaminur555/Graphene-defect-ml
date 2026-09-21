@@ -111,7 +111,7 @@ def write_in(path: str, data_filename: str, airebo_filename: str, seed: int = 12
         if ensemble == 'nvt':
             f.write('fix nvt_vibrate free nvt temp 300.0 300.0 0.1\n')
         else:
-            f.write('fix vibrate free npt temp 300.0 300.0 0.1 x 0.0 0.0 1.0 z 0.0 0.0 1.0\n')
+            f.write(f'fix {vibrate_fix_name} free npt temp 300.0 300.0 0.1 x 0.0 0.0 1.0 z 0.0 0.0 1.0\n')
 
         f.write('run 30000\n')
         f.write(f'unfix {vibrate_fix_name}\n')
