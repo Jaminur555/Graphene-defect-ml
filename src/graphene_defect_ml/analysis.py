@@ -52,6 +52,96 @@ def parse_lammps_dump(path: str) -> list:
     return frames
 
 
+def parse_lammps_log(path: str) -> list:
+    """
+    Parse a LAMMPS log file into a list of per-run thermo blocks (one block per
+    'run N' command executed). Each block covers the thermo table printed for
+    that run, e.g. block 0 is Stage 1 (relax), block 1 is Stage 2 (vibrate).
+ 
+    Args:
+        path (str): path to log.lammps
+ 
+    Returns:
+        list[dict]: one entry per run block, each with:
+            'columns' (list[str]), 'data' (np.ndarray, shape (n_rows, n_columns))
+    """
+    with open(path, 'r') as f:
+        lines = f.readlines()
+ 
+    blocks = []
+    i = 0
+    while i < len(lines):
+        stripped = lines[i].strip()
+        if stripped.startswith('Step'):
+            columns = stripped.split()
+            rows = []
+            i += 1
+            while i < len(lines):
+                parts = lines[i].split()
+                if len(parts) != len(columns):
+                    break
+                try:
+                    rows.append([float(p) for p in parts])
+                except ValueError:
+                    break
+                i += 1
+            blocks.append({'columns': columns, 'data': np.array(rows)})
+        else:
+            i += 1
+ 
+    return blocks
+
+
+def check_relax_convergence(log_path: str, run_index: int = 0, tail_frac: float = 0.3,
+                             pe_tol_pct: float = 0.05) -> dict:
+    """
+    Check whether PotEng has plateaued by the end of a given run block in a LAMMPS log,
+    to sanity-check whether the Stage-1 relax duration is actually long enough before
+    it's used as the reference configuration for downstream vibration analysis.
+ 
+    Compares the mean PotEng over the final `tail_frac` of the block against the mean
+    PotEng over the `tail_frac` immediately preceding it; flags convergence if they
+    differ by less than pe_tol_pct percent.
+ 
+    Args:
+        log_path (str)      : path to log.lammps
+        run_index (int)     : which run block to check. Defaults to 0 (Stage 1 relax).
+        tail_frac (float)   : fraction of the block's rows used for each comparison window. Defaults to 0.3.
+        pe_tol_pct (float)  : percent-change threshold below which PotEng is considered converged. Defaults to 0.05.
+ 
+    Returns:
+        dict: {'converged': bool, 'pct_change': float,
+               'mean_pe_last_tail': float, 'mean_pe_prev_tail': float, 'n_rows': int}
+    """
+    blocks = parse_lammps_log(log_path)
+    if run_index >= len(blocks):
+        raise ValueError(f"Log has only {len(blocks)} run block(s); requested index {run_index}")
+ 
+    block = blocks[run_index]
+    pe_idx = block['columns'].index('PotEng')
+    pe = block['data'][:, pe_idx]
+    n = len(pe)
+ 
+    tail_n = max(2, int(n * tail_frac))
+    if n < 2 * tail_n:
+        raise ValueError(f"Run block {run_index} has too few thermo rows ({n}) "
+                         f"for tail_frac={tail_frac}; lower thermo output interval or tail_frac.")
+ 
+    last_tail = pe[-tail_n:]
+    prev_tail = pe[-2 * tail_n:-tail_n]
+    mean_last = float(last_tail.mean())
+    mean_prev = float(prev_tail.mean())
+    pct_change = 100 * abs(mean_last - mean_prev) / abs(mean_prev)
+ 
+    return {
+        'converged': pct_change < pe_tol_pct,
+        'pct_change': pct_change,
+        'mean_pe_last_tail': mean_last,
+        'mean_pe_prev_tail': mean_prev,
+        'n_rows': n,
+    }
+ 
+
 def vibration_amplitude(dump_path: str, column: str = 'c_ydisp[2]') -> dict:
     """
     Compute the out-of-plane vibration amplitude from a `vibration.lammpstrj` dump,
