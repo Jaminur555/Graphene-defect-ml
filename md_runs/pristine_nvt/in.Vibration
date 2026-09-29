@@ -23,7 +23,7 @@ timestep 0.001
 thermo 1000
 thermo_style custom step c_freetemp pe etotal press
 
-#==== Stage 1: NVT relax, 10 ps ====
+#==== Stage 1: NVT relax, 10000 steps ====
 dump relax_full all custom 50 relax_structure.lammpstrj id x y z
 dump_modify relax_full sort id
 fix nvt_relax free nvt temp 300.0 300.0 0.1
@@ -31,7 +31,7 @@ run 10000
 unfix nvt_relax
 undump relax_full
 
-#=== Stage 2: NVT vibrate, 30 ps, dump out-of-plane displacement ====
+#=== Stage 2: NVT vibrate, 30000 steps, dump out-of-plane displacement ====
 compute ydisp free displace/atom
 dump vib free custom 50 vibration.lammpstrj id x y z c_ydisp[2]
 dump_modify vib sort id

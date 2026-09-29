@@ -21,7 +21,7 @@ result = vibration_amplitude(DUMP_PATH)
 print(f"Parsed {result['n_frames']} frames, {result['n_atoms']} free atoms\n")
 print(f"RMS amplitude:        {result['rms_amplitude']:.4f} Å")
 print(f"Mean peak amplitude:  {result['mean_peak_amplitude']:.4f} Å")
-print(f"Paper 1 benchmark:    ~{PAPER_BENCHMARK_A} Å\n")
+print(f"benchmark:    ~{PAPER_BENCHMARK_A} Å\n")
 
 for label, value in [('RMS', result['rms_amplitude']),
                       ('mean peak', result['mean_peak_amplitude'])]:

@@ -12,6 +12,14 @@ group fixed molecule 2
 pair_style airebo 2.0
 pair_coeff * * CH_modified.airebo C
 
+#==== Stage 0: relax whole (unclamped) sheet to zero pressure ====
+thermo 50
+thermo_style custom step pe press lx lz
+fix box_relax all box/relax x 0.0 z 0.0 vmax 0.001
+min_style cg
+minimize 1.0e-10 1.0e-10 10000 100000
+unfix box_relax
+
 velocity free create 300.0 12345 mom yes rot yes dist gaussian
 velocity fixed set 0.0 0.0 0.0
 
