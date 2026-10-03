@@ -12,35 +12,30 @@ group fixed molecule 2
 pair_style airebo 2.0
 pair_coeff * * CH_modified.airebo C
 
-#==== Stage 0: relax whole (unclamped) sheet to zero pressure ====
-thermo 50
-thermo_style custom step pe press lx lz
-fix box_relax all box/relax x 0.0 z 0.0 vmax 0.001
-min_style cg
-minimize 1.0e-10 1.0e-10 10000 100000
-unfix box_relax
-
-velocity free create 300.0 12345 mom yes rot yes dist gaussian
 velocity fixed set 0.0 0.0 0.0
-
 fix freeze fixed setforce 0.0 0.0 0.0
 
+#==== Stage 0: minimize the free atoms, border frozen ====
+thermo 100
+thermo_style custom step fmax fnorm
+min_style cg
+minimize 0.0 1e-05 10000 100000
+reset_timestep 0
+
+compute ydisp free displace/atom
+
+velocity free create 300.0 12345 mom yes rot yes dist gaussian
 compute freetemp free temp
 
 timestep 0.001
 thermo 1000
-thermo_style custom step c_freetemp pe etotal press
+thermo_style custom step c_freetemp pe etotal press lx lz
 
 #==== Stage 1: NVT relax, 30000 steps ====
-dump relax_full all custom 50 relax_structure.lammpstrj id x y z
-dump_modify relax_full sort id
 fix nvt_relax free nvt temp 300.0 300.0 0.1
 run 30000
 unfix nvt_relax
-undump relax_full
-
 #=== Stage 2: NVT vibrate, 30000 steps, dump out-of-plane displacement ====
-compute ydisp free displace/atom
 dump vib free custom 50 vibration.lammpstrj id x y z c_ydisp[2]
 dump_modify vib sort id
 dump full_struct all custom 50 full_structure.lammpstrj id x y z

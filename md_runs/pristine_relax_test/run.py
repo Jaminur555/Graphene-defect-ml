@@ -33,7 +33,7 @@ print("Files generated, launching LAMMPS....")
 run_lammps(str(RUN_DIR), "in.Vibration")
 print("Done.")
 
-result = check_relax_convergence(str(RUN_DIR / "log.lammps"), run_index=0)
+result = check_relax_convergence(str(RUN_DIR / "log.lammps"), run_index=1)
 print(f"\nRelax convergence check (Stage 1, {RELAX_STEPS} steps):")
 print(f"  PotEng change (last vs. prior tail window): {result['pct_change']:.4f}%")
 print(f"  Converged (< 0.05% threshold): {result['converged']}")

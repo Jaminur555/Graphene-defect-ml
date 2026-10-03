@@ -95,9 +95,9 @@ Per MPI rank memory allocation (min/avg/max) = 12.01 | 12.01 | 12.01 Mbytes
       2050  -6951.2503     -0.99688229     69.93751       70.180569    
       2100  -6951.2504      0.39349459     69.936711      70.18066     
       2122  -6951.2504      0.66215139     69.936793      70.180365    
-Loop time of 19.9441 on 4 procs for 2122 steps with 966 atoms
+Loop time of 19.5977 on 4 procs for 2122 steps with 966 atoms
 
-399.6% CPU use with 1 MPI tasks x 4 OpenMP threads
+399.7% CPU use with 1 MPI tasks x 4 OpenMP threads
 
 Minimization stats:
   Stopping criterion = energy tolerance
@@ -111,13 +111,13 @@ Minimization stats:
 MPI task timing breakdown:
 Section |  min time  |  avg time  |  max time  |%varavg| %total
 ---------------------------------------------------------------
-Pair    | 19.786     | 19.786     | 19.786     |   0.0 | 99.21
-Bond    | 0.0003294  | 0.0003294  | 0.0003294  |   0.0 |  0.00
+Pair    | 19.446     | 19.446     | 19.446     |   0.0 | 99.23
+Bond    | 0.00031677 | 0.00031677 | 0.00031677 |   0.0 |  0.00
 Neigh   | 0          | 0          | 0          |   0.0 |  0.00
-Comm    | 0.0031925  | 0.0031925  | 0.0031925  |   0.0 |  0.02
-Output  | 0.0011832  | 0.0011832  | 0.0011832  |   0.0 |  0.01
+Comm    | 0.0032509  | 0.0032509  | 0.0032509  |   0.0 |  0.02
+Output  | 0.0011595  | 0.0011595  | 0.0011595  |   0.0 |  0.01
 Modify  | 0          | 0          | 0          |   0.0 |  0.00
-Other   |            | 0.1533     |            |       |  0.77
+Other   |            | 0.1466     |            |       |  0.75
 
 Nlocal:            966 ave         966 max         966 min
 Histogram: 1 0 0 0 0 0 0 0 0 0
@@ -137,4 +137,4 @@ Dangerous builds = 0
 print "Final box: lx = $(lx) lz = $(lz) press = $(press)"
 Final box: lx = 69.936793359183354823 lz = 70.180365433391330043 press = 0.66215139403897083081
 write_dump all custom relaxed.lammpstrj id x y z
-Total wall time: 0:00:20
+Total wall time: 0:00:19

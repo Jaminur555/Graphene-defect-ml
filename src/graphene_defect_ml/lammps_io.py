@@ -46,12 +46,12 @@ def write_data(path: str, atoms_mtxyz: np.ndarray) -> None:
 def write_in(path: str, data_filename: str, airebo_filename: str, seed: int = 12345,
             ensemble: str = 'nvt', relax_steps: int = 10000, vibrate_steps: int = 30000,
             relax_damp: float = 0.1, vibrate_damp: float = 0.1,
-            minimize_first: bool = True, box_relax_vmax: float = 0.001) -> None:   # <<< NEW params
+            minimize_first: bool = True, min_ftol: float = 1.0e-5) -> None:
     """
     Write the LAMMPS .in script for the thermal-vibration protocol
-        0. (optional) Zero-pressure box/relax + energy minimization of the full,
-           unclamped sheet, to remove built-in strain from the as-built lattice
-           before the boundary is clamped                                          # <<< NEW stage
+        0. (optional) Energy minimization of the free atoms only, with the clamped
+           border already frozen, so vacancy reconstruction is deterministic before
+           thermal velocities are assigned             
         1. NVT relax at 300 K for relax_steps
         2. Thermostatted (NVT or NPT) vibration at 300 K for vibrate_steps
         3. Dump per-atom out-of-plane (y) displacement at 20 THz
@@ -67,10 +67,8 @@ def write_in(path: str, data_filename: str, airebo_filename: str, seed: int = 12
         vibrate_steps (int)    : Stage-2 vibration duration, in 1 fs steps. Defaults to 30000 (30 ps).
         relax_damp (float)     : Nose-Hoover temperature damping (ps) for the Stage-1 relax fix. Defaults to 0.1.
         vibrate_damp (float)   : Nose-Hoover temperature damping (ps) for the Stage-2 vibrate fix. Defaults to 0.1.
-        minimize_first (bool)  : whether to run Stage 0 (box/relax + minimize) before clamping
-                                  and thermalizing. Defaults to True.                # <<< NEW
-        box_relax_vmax (float) : max fractional box-dimension change per iteration for Stage 0's
-                                  box/relax fix, matching calibration/in.relax. Defaults to 0.001.  # <<< NEW
+        minimize_first (bool)  : run Stage 0 (minimize free atoms, border frozen). Default to True
+        min_ftol (float)       : force tolerance (eV/A) for Stage 0. Defaults to 1e-5.
     """
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -97,41 +95,32 @@ def write_in(path: str, data_filename: str, airebo_filename: str, seed: int = 12
         f.write('pair_style airebo 2.0\n')
         f.write(f'pair_coeff * * {airebo_filename} C\n\n')
 
-        # Stage 0 — relax the whole unclamped sheet to zero
-        # pressure before the boundary is clamped and before any thermal velocities
-        # are assigned. This removes the ~0.6-0.9% built-in compressive strain from
-        # the fixed 70x70 A box vs. this potential's true equilibrium box.
-        if minimize_first:
-            f.write('#==== Stage 0: relax whole (unclamped) sheet to zero pressure ====\n')
-            f.write('thermo 50\n')
-            f.write('thermo_style custom step pe press lx lz\n')
-            f.write(f'fix box_relax all box/relax x 0.0 z 0.0 vmax {box_relax_vmax}\n')
-            f.write('min_style cg\n')
-            f.write('minimize 1.0e-10 1.0e-10 10000 100000\n')
-            f.write('unfix box_relax\n\n')
-        
-
-        f.write(f'velocity free create 300.0 {seed} mom yes rot yes dist gaussian\n')
-        f.write('velocity fixed set 0.0 0.0 0.0\n\n')
-
+        # Clamp the border FIRST, so Stage 0 relaxes only the free atoms
+        # and the border stays at the ideal lattice positions
+        f.write('velocity fixed set 0.0 0.0 0.0\n')
         f.write('fix freeze fixed setforce 0.0 0.0 0.0\n\n')
-
+        if minimize_first:
+            f.write('#==== Stage 0: minimize the free atoms, border frozen ====\n')
+            f.write('thermo 100\n')
+            f.write('thermo_style custom step fmax fnorm\n')
+            f.write('min_style cg\n')
+            f.write(f'minimize 0.0 {min_ftol} 10000 100000\n')
+            f.write('reset_timestep 0\n\n')
+        
+        f.write('compute ydisp free displace/atom\n\n')
+        f.write(f'velocity free create 300.0 {seed} mom yes rot yes dist gaussian\n')
         f.write('compute freetemp free temp\n\n')
 
         f.write('timestep 0.001\n')      # metal units use ps; 0.001 ps = 1 fs
         f.write('thermo 1000\n')
-        f.write('thermo_style custom step c_freetemp pe etotal press\n\n')
+        f.write('thermo_style custom step c_freetemp pe etotal press lx lz\n\n')
 
         f.write(f'#==== Stage 1: NVT relax, {relax_steps} steps ====\n')
-        f.write('dump relax_full all custom 50 relax_structure.lammpstrj id x y z\n')
-        f.write('dump_modify relax_full sort id\n')
         f.write(f'fix nvt_relax free nvt temp 300.0 300.0 {relax_damp}\n')
         f.write(f'run {relax_steps}\n')
         f.write('unfix nvt_relax\n')
-        f.write('undump relax_full\n\n')
 
         f.write(f'#=== Stage 2: {ensemble.upper()} vibrate, {vibrate_steps} steps, dump out-of-plane displacement ====\n')
-        f.write('compute ydisp free displace/atom\n')
         f.write(f'dump vib free custom {dump_every} vibration.lammpstrj id x y z c_ydisp[2]\n')
         f.write('dump_modify vib sort id\n')
         f.write(f'dump full_struct all custom {dump_every} full_structure.lammpstrj id x y z\n')
@@ -142,6 +131,7 @@ def write_in(path: str, data_filename: str, airebo_filename: str, seed: int = 12
         else:
             f.write(f'fix {vibrate_fix_name} free npt temp 300.0 300.0 {vibrate_damp} '
                     f'x 0.0 0.0 1.0 z 0.0 0.0 1.0 dilate free\n')
+            f.write(f"fix_modify {vibrate_fix_name} temp freetemp\n")
 
-        f.write('run 30000\n')
+        f.write(f'run {vibrate_steps}\n')
         f.write(f'unfix {vibrate_fix_name}\n')

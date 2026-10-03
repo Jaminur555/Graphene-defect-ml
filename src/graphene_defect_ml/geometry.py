@@ -1,7 +1,7 @@
 import numpy as np
 from ase.build import graphene_nanoribbon
 
-BOND_LENGTH = 1.3992    # Angstrom, C-C bond length in graphene
+BOND_LENGTH = 1.3951 + 0.0040   # Angstrom, C-C bond length in graphene
 
 
 def build_graphene_sheet(n: int = 21, m: int = 23, row_border: int = 4) -> dict:
@@ -12,7 +12,8 @@ def build_graphene_sheet(n: int = 21, m: int = 23, row_border: int = 4) -> dict:
     Args:
         n (int)         : ASE graphene_nanoribbon width parameter. Defaults to 21.
         m (int)         : ASE graphene_nanoribbon length parameter. Defaults to 23.
-        row_border (int): Number of outermost atom rows/columns treated as the fixed border. Defaults to 4.
+        row_border (int): Number of outermost atom rows/columns treated as the fixed border. 
+                          Defaults to 4.
 
     Returns:
         dict:
@@ -43,13 +44,15 @@ def build_graphene_sheet(n: int = 21, m: int = 23, row_border: int = 4) -> dict:
     for local_row, zval in enumerate(interior_rows):
         row_sel   = np.isclose(z_round, zval)
         xs_in_row = np.sort(x[row_sel])
-        lo, hi    = xs_in_row[0], xs_in_row[-1]
+        left_inner, right_inner = xs_in_row[0], xs_in_row[-1]
 
         # drop the outermost atom on each end of this row (column border)
-        row_free  = row_sel & (x > lo + 0.01) & (x < hi - 0.01)
+        row_free  = row_sel & (x > left_inner + 0.01) & (x < right_inner - 0.01)
         free_mask |= row_free
+        
         free_row[row_free] = local_row
         xs_free_sorted     = np.sort(x[row_free])
+        
         col_lookup = {val: idx for idx, val in enumerate(xs_free_sorted)}
 
         for atom_idx in np.where(row_free)[0]:

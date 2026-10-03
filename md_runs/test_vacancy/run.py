@@ -21,7 +21,9 @@ SEED        = 12345
 
 sheet     = build_graphene_sheet()
 sheet_vac = remove_vacancy(sheet, target_row=VACANCY_ROW, target_col=VACANCY_COL)
-print(f"free: {sheet_vac['free_xy'].shape[0]} fixed: {sheet_vac['fixed_xy'].shape[0]}")
+n_free, n_fixed = sheet_vac['free_xy'].shape[0], sheet_vac['fixed_xy'].shape[0]
+print(f"free: {n_free} fixed: {n_fixed}")
+assert n_free == 721 and n_fixed == 244, "vacancy insertion changed the wrong atom count"
 
 atoms = assemble_graphene(sheet_vac)
 write_data(str(RUN_DIR / "sheet.data"), atoms)
