@@ -1,7 +1,18 @@
 """
-Pristine (no-vacancy) baseline run.
+Pristine graphene reference run.
 
-Generates sheet.data, in.vibration in same directory, then runs LAMMPS.
+Reference-matched protocol:
+
+    966 total atoms
+    722 free atoms
+    244 fixed atoms
+
+    10 ps NVT relaxation
+    30 ps NPT vibration
+
+    300 K
+    1 fs timestep
+    20 THz trajectory sampling
 """
 
 from pathlib import Path

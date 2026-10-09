@@ -2,14 +2,14 @@
 
 units metal
 dimension 3
-boundary p f p
+boundary p p f
 atom_style molecular
 read_data sheet.data
 
 group free molecule 1
 group fixed molecule 2
 
-pair_style airebo 2.0
+pair_style airebo 6.8
 pair_coeff * * CH_modified.airebo C
 
 velocity fixed set 0.0 0.0 0.0
@@ -22,25 +22,25 @@ min_style cg
 minimize 0.0 1e-05 10000 100000
 reset_timestep 0
 
-compute ydisp free displace/atom
+compute zdisp free displace/atom
 
 velocity free create 300.0 12345 mom yes rot yes dist gaussian
 compute freetemp free temp
 
 timestep 0.001
 thermo 1000
-thermo_style custom step c_freetemp pe etotal press lx lz
+thermo_style custom step c_freetemp pe etotal press lx ly lz
 
 #==== Stage 1: NVT relax, 10000 steps ====
 fix nvt_relax free nvt temp 300.0 300.0 0.1
 run 10000
 unfix nvt_relax
 #=== Stage 2: NPT vibrate, 30000 steps, dump out-of-plane displacement ====
-dump vib free custom 50 vibration.lammpstrj id x y z c_ydisp[2]
+dump vib free custom 50 vibration.lammpstrj id x y z c_zdisp[3]
 dump_modify vib sort id
 dump full_struct all custom 50 full_structure.lammpstrj id x y z
 dump_modify full_struct sort id
-fix npt_vibrate free npt temp 300.0 300.0 0.1 x 0.0 0.0 1.0 z 0.0 0.0 1.0 dilate free
+fix npt_vibrate free npt temp 300.0 300.0 0.1 x 0.0 0.0 1.0 y 0.0 0.0 1.0 dilate free
 fix_modify npt_vibrate temp freetemp
 run 30000
 unfix npt_vibrate

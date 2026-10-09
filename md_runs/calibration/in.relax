@@ -3,18 +3,18 @@
 
 units metal
 dimension 3
-boundary p f p 
+boundary p p f
 atom_style molecular
 read_data sheet.data
 
-pair_style airebo 2.0
+pair_style airebo 6.8
 pair_coeff * * CH_modified.airebo C
 
 
 thermo 50 
 thermo_style custom step pe press lx lz
 
-fix relax all box/relax x 0.0 z 0.0 vmax 0.001
+fix relax all box/relax x 0.0 y 0.0 vmax 0.001
 
 min_style cg
 minimize 1.0e-10 1.0e-10 10000 100000

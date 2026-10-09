@@ -18,6 +18,8 @@ VACANCY_ROW = 17
 VACANCY_COL = 10
 SEED        = 12345
 
+ENSEMBLE = 'nvt'
+
 
 sheet     = build_graphene_sheet()
 sheet_vac = remove_vacancy(sheet, target_row=VACANCY_ROW, target_col=VACANCY_COL)
@@ -30,7 +32,7 @@ atoms = assemble_graphene(sheet_vac)
 write_data(str(RUN_DIR / "sheet.data"), atoms)
 
 modify_airebo_cutoff(str(POTENTIAL_SRC), str(POTENTIAL_DST))
-write_in(str(RUN_DIR / "in.Vibration"), "sheet.data", "CH_modified.airebo", seed=SEED)
+write_in(str(RUN_DIR / "in.Vibration"), "sheet.data", "CH_modified.airebo", seed=SEED, ensemble=ENSEMBLE)
 
 print("Files generated, launching LAMMPS...")
 run_lammps(str(RUN_DIR), "in.Vibration")

@@ -21,33 +21,35 @@ def build_graphene_sheet(n: int = 21, m: int = 23, row_border: int = 4) -> dict:
         'free_xy'    : (n_free, 2) array of free-atom (x, z) coords
         'free_row'   : (n_free,) row index of each free atom (0-based)
         'free_col'   : (n_free,) column index of each free atom (0-based)
-        'n_rows_free', 'n_cols_free' : interior grid dimensions
+        'n_rows_free': Number of free rows.
+        'n_cols_free': Number of free columns
     """
 
     ribbon = graphene_nanoribbon(n, m, type='zigzag', saturated=False,
                                  C_C=BOND_LENGTH, vacuum=15.0)
 
     pos  = ribbon.get_positions()
-    x, z = pos[:, 0], pos[:, 2]
+    x, y = pos[:, 0], pos[:, 2]
 
-    z_round   = np.round(z, 2)
-    z_levels  = np.sort(np.unique(z_round))
-    row_index = np.searchsorted(z_levels, z_round)
+    y_round   = np.round(y, 2)
+    y_levels  = np.sort(np.unique(y_round))
+    row_index = np.searchsorted(y_levels, y_round)
 
-    is_row_border = (row_index < row_border) | (row_index >= len(z_levels) - row_border)
+    is_row_border = (row_index < row_border) | (row_index >= len(y_levels) - row_border)
 
     free_mask = np.zeros(len(pos), dtype=bool)
     free_row  = np.full(len(pos), -1, dtype=int)
     free_col  = np.full(len(pos), -1, dtype=int)
 
-    interior_rows = z_levels[row_border: len(z_levels) - row_border]
-    for local_row, zval in enumerate(interior_rows):
-        row_sel   = np.isclose(z_round, zval)
+    interior_rows = y_levels[row_border: len(y_levels) - row_border]
+    
+    for local_row, yval in enumerate(interior_rows):
+        row_sel   = np.isclose(y_round, yval)
         xs_in_row = np.sort(x[row_sel])
+        
         left_inner, right_inner = xs_in_row[0], xs_in_row[-1]
-
-        # drop the outermost atom on each end of this row (column border)
         row_free  = row_sel & (x > left_inner + 0.01) & (x < right_inner - 0.01)
+        
         free_mask |= row_free
         
         free_row[row_free] = local_row
@@ -63,8 +65,8 @@ def build_graphene_sheet(n: int = 21, m: int = 23, row_border: int = 4) -> dict:
     n_rows_free = len(interior_rows)
 
     return {
-        'fixed_xy': pos[fixed_mask][:, [0, 2]],
-        'free_xy' : pos[free_mask][:, [0, 2]],
+        'fixed_xy': np.column_stack((x[fixed_mask], y[fixed_mask])),
+        'free_xy' : np.column_stack((x[free_mask], y[free_mask])),
         'free_row': free_row[free_mask],
         'free_col': free_col[free_mask],
         'n_rows_free': n_rows_free,
@@ -119,16 +121,16 @@ def assemble_graphene(sheet: dict) -> np.ndarray:
         np.ones((n_free, 1)),      # molecule id: 1 = free
         np.ones((n_free, 1)),      # atom type  : 1 = carbon
         sheet['free_xy'][:, [0]],  # x
-        np.zeros((n_free, 1)),     # y (flat sheet)
-        sheet['free_xy'][:, [1]]   # z (in-plane 2nd axis)
+        sheet['free_xy'][:, [1]],  # y (in-plane 2nd axis)
+        np.zeros((n_free, 1)),     # z = 0 (flat sheet)
     ))
 
     fixed_rows = np.hstack((
         2 * np.ones((n_fixed, 1)), # molecule id: 2 = fixed
         np.ones((n_fixed, 1)),     # atom type  : 1 = carbon
         sheet['fixed_xy'][:, [0]],
+        sheet['fixed_xy'] [:, [1]],
         np.zeros((n_fixed, 1)),
-        sheet['fixed_xy'] [:, [1]]
     ))
 
     return np.vstack((free_rows, fixed_rows))

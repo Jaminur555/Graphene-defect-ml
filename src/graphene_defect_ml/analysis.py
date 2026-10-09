@@ -25,6 +25,7 @@ def parse_lammps_dump(path: str) -> list:
     i = 0
     while i < n_lines:
         line = lines[i]
+        
         if line.startswith('ITEM: TIMESTEP'):
             timestep = int(lines[i + 1])
             i += 2
@@ -65,6 +66,7 @@ def parse_lammps_log(path: str) -> list:
         list[dict]: one entry per run block, each with:
             'columns' (list[str]), 'data' (np.ndarray, shape (n_rows, n_columns))
     """
+    
     with open(path, 'r') as f:
         lines = f.readlines()
  
@@ -72,12 +74,15 @@ def parse_lammps_log(path: str) -> list:
     i = 0
     while i < len(lines):
         stripped = lines[i].strip()
+        
         if stripped.startswith('Step'):
             columns = stripped.split()
             rows = []
             i += 1
+            
             while i < len(lines):
                 parts = lines[i].split()
+                
                 if len(parts) != len(columns):
                     break
                 try:
@@ -113,28 +118,34 @@ def check_relax_convergence(log_path: str, run_index: int = 0, tail_frac: float 
         dict: {'converged': bool, 'pct_change': float,
                'mean_pe_last_tail': float, 'mean_pe_prev_tail': float, 'n_rows': int}
     """
+    
     blocks = parse_lammps_log(log_path)
+    
     if run_index >= len(blocks):
         raise ValueError(f"Log has only {len(blocks)} run block(s); requested index {run_index}")
  
-    block = blocks[run_index]
+    block  = blocks[run_index]
     pe_idx = block['columns'].index('PotEng')
+    
     pe = block['data'][:, pe_idx]
-    n = len(pe)
+    n  = len(pe)
  
     tail_n = max(2, int(n * tail_frac))
+    
     if n < 2 * tail_n:
         raise ValueError(f"Run block {run_index} has too few thermo rows ({n}) "
                          f"for tail_frac={tail_frac}; lower thermo output interval or tail_frac.")
  
     last_tail = pe[-tail_n:]
     prev_tail = pe[-2 * tail_n:-tail_n]
+    
     mean_last = float(last_tail.mean())
     mean_prev = float(prev_tail.mean())
+    
     pct_change = 100 * abs(mean_last - mean_prev) / abs(mean_prev)
  
     return {
-        'converged': pct_change < pe_tol_pct,
+        'converged' : pct_change < pe_tol_pct,
         'pct_change': pct_change,
         'mean_pe_last_tail': mean_last,
         'mean_pe_prev_tail': mean_prev,
@@ -142,7 +153,8 @@ def check_relax_convergence(log_path: str, run_index: int = 0, tail_frac: float 
     }
  
 
-def vibration_amplitude(dump_path: str, column: str = 'c_ydisp[2]') -> dict:
+def vibration_amplitude(dump_path: str, column: str = 'c_zdisp[3]',
+                        remove_time_mean: bool = False) -> dict:
     """
     Compute the out-of-plane vibration amplitude from a `vibration.lammpstrj` dump,
     for comparison against reported ~0.3 A benchmark on a pristine sheet
@@ -162,6 +174,7 @@ def vibration_amplitude(dump_path: str, column: str = 'c_ydisp[2]') -> dict:
                'n_frames': int, 'n_atoms': int}
     """
     frames = parse_lammps_dump(dump_path)
+    
     if not frames:
         raise ValueError(f"No frames parsed from {dump_path}")
 
@@ -172,17 +185,22 @@ def vibration_amplitude(dump_path: str, column: str = 'c_ydisp[2]') -> dict:
     # (n_frames, n_atoms) matrix of displacement values, atoms sorted by id
     # so each column tracks the same physical atom across all frames.
     disp = np.zeros((len(frames), n_atoms))
+    
     for f_idx, frame in enumerate(frames):
         order       = np.argsort(frame['data'][:, id_idx])
         disp[f_idx] = frame['data'][order, col_idx]
+    
+    if remove_time_mean:
+        disp = disp - disp.mean(axis=0, keepdims=True)
 
     rms_amplitude = float(np.sqrt(np.mean(disp ** 2)))
+    
     per_atom_peak = (disp.max(axis=0) - disp.min(axis=0)) / 2
     mean_peak_amplitude = float(per_atom_peak.mean())
 
     return {
-        'rms_amplitude': rms_amplitude,
+        'rms_amplitude'       : rms_amplitude,
         'mean_peak_amplitude': mean_peak_amplitude,
         'n_frames': len(frames),
-        'n_atoms': n_atoms,
+        'n_atoms' : n_atoms,
     }
