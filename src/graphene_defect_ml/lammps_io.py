@@ -1,8 +1,8 @@
 import os
 import numpy as np
 
-BOX_X = BOX_Y = 70     # Angstrom, extent of x and z axis
-BOX_Z = 25.0           # Angstrom, half-height of vacuum region
+BOX_X = BOX_Y = 70     # Angstrom, extent of x and y axis
+BOX_Z = 25.0           # Angstrom, extent of z
 
 
 def write_data(path: str, atoms_mtxyz: np.ndarray) -> None:
@@ -24,10 +24,13 @@ def write_data(path: str, atoms_mtxyz: np.ndarray) -> None:
     n_atoms = atoms_mtxyz.shape[0]
 
     x_center = (atoms_mtxyz[:, 2].min() + atoms_mtxyz[:, 2].max()) / 2
-    y_center = (atoms_mtxyz[:, 4].min() + atoms_mtxyz[:, 4].max()) / 2
+    y_center = (atoms_mtxyz[:, 3].min() + atoms_mtxyz[:, 3].max()) / 2
     xlo, xhi = x_center - BOX_X / 2, x_center + BOX_X / 2
-    ylo, yhi = y_center - BOX_X / 2, y_center + BOX_X / 2
+    ylo, yhi = y_center - BOX_Y / 2, y_center + BOX_Y / 2
     zlo, zhi = -BOX_Z / 2, BOX_Z /2
+    
+    assert atoms_mtxyz[:, 2].min() > xlo and atoms_mtxyz[:, 2].max() < xhi
+    assert atoms_mtxyz[:, 3].min() > ylo and atoms_mtxyz[:, 3].max() < yhi, "sheet wraps across the box"
 
 
     with open(path, 'w') as f:
@@ -104,7 +107,7 @@ def write_in(path: str, data_filename: str, airebo_filename: str, seed: int = 12
         f.write('group free molecule 1\n')
         f.write('group fixed molecule 2\n\n')
 
-        f.write('pair_style airebo 6.8\n') # I have boubt
+        f.write('pair_style airebo 2.0 1 1\n') 
         f.write(f'pair_coeff * * {airebo_filename} C\n\n')
 
         # Clamp the border FIRST, so Stage 0 relaxes only the free atoms
@@ -142,7 +145,7 @@ def write_in(path: str, data_filename: str, airebo_filename: str, seed: int = 12
             f.write(f'fix nvt_vibrate free nvt temp 300.0 300.0 {vibrate_damp}\n')
         else:
             f.write(f'fix {vibrate_fix_name} free npt temp 300.0 300.0 {vibrate_damp} '
-                    f'x 0.0 0.0 1.0 y 0.0 0.0 1.0 dilate free\n')
+                    f'x 0.0 0.0 1.0 y 0.0 0.0 1.0 couple xy\n')
             f.write(f"fix_modify {vibrate_fix_name} temp freetemp\n")
 
         f.write(f'run {vibrate_steps}\n')

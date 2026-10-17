@@ -9,7 +9,7 @@ read_data sheet.data
 group free molecule 1
 group fixed molecule 2
 
-pair_style airebo 6.8
+pair_style airebo 2.0 1 1
 pair_coeff * * CH_modified.airebo C
 
 velocity fixed set 0.0 0.0 0.0
@@ -35,6 +35,7 @@ thermo_style custom step c_freetemp pe etotal press lx ly lz
 fix nvt_relax free nvt temp 300.0 300.0 0.1
 run 10000
 unfix nvt_relax
+
 #=== Stage 2: NVT vibrate, 30000 steps, dump out-of-plane displacement ====
 dump vib free custom 50 vibration.lammpstrj id x y z c_zdisp[3]
 dump_modify vib sort id

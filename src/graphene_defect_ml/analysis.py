@@ -97,7 +97,7 @@ def parse_lammps_log(path: str) -> list:
     return blocks
 
 
-def check_relax_convergence(log_path: str, run_index: int = 0, tail_frac: float = 0.3,
+def check_relax_convergence(log_path: str, run_index: int = 1, tail_frac: float = 0.3,
                              pe_tol_pct: float = 0.05) -> dict:
     """
     Check whether PotEng has plateaued by the end of a given run block in a LAMMPS log,
@@ -110,7 +110,7 @@ def check_relax_convergence(log_path: str, run_index: int = 0, tail_frac: float 
  
     Args:
         log_path (str)      : path to log.lammps
-        run_index (int)     : which run block to check. Defaults to 0 (Stage 1 relax).
+        run_index (int)     : which run block to check. Defaults to 1 (Stage 1 relax).
         tail_frac (float)   : fraction of the block's rows used for each comparison window. Defaults to 0.3.
         pe_tol_pct (float)  : percent-change threshold below which PotEng is considered converged. Defaults to 0.05.
  
@@ -156,7 +156,7 @@ def check_relax_convergence(log_path: str, run_index: int = 0, tail_frac: float 
 def vibration_amplitude(dump_path: str, column: str = 'c_zdisp[3]',
                         remove_time_mean: bool = False) -> dict:
     """
-    Compute the out-of-plane vibration amplitude from a `vibration.lammpstrj` dump,
+    Compute the out-of-plane vibration amplitude from a 'vibration.lammpstrj' dump,
     for comparison against reported ~0.3 A benchmark on a pristine sheet
 
     Two amplitude conventions are implemented:
@@ -166,7 +166,7 @@ def vibration_amplitude(dump_path: str, column: str = 'c_zdisp[3]',
     Args:
         dump_path (str): path to vibration.lammpstrj
         column (str)   : dump column holding the out-of-plane displacement.
-                         Defaults to 'c_ydisp[2]', matching the `compute ydisp`
+                         Defaults to 'c_zdisp[3]', matching the `compute ydisp`
                          defined in lammps_io.write_in().
 
     Returns:
@@ -204,3 +204,37 @@ def vibration_amplitude(dump_path: str, column: str = 'c_zdisp[3]',
         'n_frames': len(frames),
         'n_atoms' : n_atoms,
     }
+    
+    
+def load_displacement(dump_path, column='c_zdisp[3]', md_timestep_fs=1.0):
+    frames  = parse_lammps_dump(dump_path)
+    cols    = frames[0]['columns']
+    ci, ii  = cols.index(column), cols.index('id')
+    n       = frames[0]['n_atoms']
+    
+    steps = np.array([f['timestep'] for f in frames])
+    diffs = np.unique(np.diff(steps))
+    
+    if len(diffs) != 1:
+        raise ValueError(f"non-uniform frame spacing in {dump_path}: {diffs}")
+    dt = diffs[0] * md_timestep_fs * 1e-5
+    
+    z = np.empty((len(frames), n))    
+    for k, f in enumerate(frames):
+        d = f['data'][np.argsort(f['data'][:, ii])]
+        
+        if not np.array_equal(d[:, ii].astype(int), np.arange(1, n + 1)):
+            raise ValueError("atom ids are not 1..N")
+        z[k] = d[:, ci]   
+    return z, dt 
+
+
+def spectral_energy(z, dt, remove_mean=True):
+    if remove_mean:
+        z = z - z.mean(axis=0, keepdims=True)
+        
+    power = np.abs(np.fft.rfft(z, axis=0)) ** 2
+    f     = np.fft.rfftfreq(z.shape[0], d=dt)
+    trap  = getattr(np, "trapezoid", None) or np.trapz
+    
+    return trap(power, f, axis=0), f, power

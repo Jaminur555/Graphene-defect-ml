@@ -7,12 +7,11 @@ boundary p p f
 atom_style molecular
 read_data sheet.data
 
-pair_style airebo 6.8
+pair_style airebo 2
 pair_coeff * * CH_modified.airebo C
 
-
 thermo 50 
-thermo_style custom step pe press lx lz
+thermo_style custom step pe press lx ly lz
 
 fix relax all box/relax x 0.0 y 0.0 vmax 0.001
 

@@ -19,10 +19,11 @@ from pathlib import Path
 import numpy as np
 
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use("Agg")           # Non-interactive rendering backend.
 import matplotlib.pyplot as plt
 
-from graphene_defect_ml import parse_lammps_dump, vibration_amplitude, build_graphene_sheet, remove_vacancy
+from graphene_defect_ml import (vibration_amplitude, build_graphene_sheet, remove_vacancy,
+                                load_displacement, spectral_energy, vacancy_label)
 
 
 RUN_DIR       = Path(__file__).parent
@@ -36,79 +37,31 @@ NEAR_RADIUS = 3.0
 
 def energy_map(dump_path, reference_xy):
     """
-    Calculate the per-atom vibrational-energy feature.
-
+    Per-atom vibrational-energy feature S for one trajectory.
+ 
     Parameters
     ----------
     dump_path : Path
-        LAMMPS vibration trajectory.
-
+        LAMMPS vibration trajectory (ids 1..N, row-major order).
     reference_xy : ndarray, shape (N, 2)
-        Fixed reference x-y coordinates corresponding to the free atoms
-        in the trajectory, in exactly the same atom ordering.
-
+        Reference x-y coordinates of the free atoms, in the same order as the ids.
+ 
     Returns
     -------
-    xy : ndarray, shape (N, 2)
-        Reference graphene x-y coordinates.
-
-    S : ndarray, shape (N,)
-        Band-integrated FFT energy for each atom.
-
-    atom_ids : ndarray
-        Atom IDs found in the trajectory.
+    xy : ndarray (N, 2)   reference coordinates
+    S  : ndarray (N,)     integrated spectral energy per atom (unnormalized)
+    dt : float            sampling interval in seconds, derived from the dump itself
+    n_frames : int
     """
-
-    frames = parse_lammps_dump(str(dump_path))
-
-    if not frames:
-        raise ValueError(f"No frames found in {dump_path}")
-
-    first = frames[0]
-    cols  = {c: i for i, c in enumerate(first["columns"])}
-
-    required_columns = {"id", "c_zdisp[3]"}
-    missing          = required_columns - set(cols)
-
-    if missing:
-        raise ValueError(f"{dump_path} is missing required columns: {sorted(missing)}")
-
-    n_frames = len(frames)
-    n_atoms  = first["n_atoms"]
-
-    if len(reference_xy) != n_atoms:
-        raise ValueError(f"Reference coordinate count ({len(reference_xy)}) does not "
-                         f"match trajectory atom count ({n_atoms}) in {dump_path}.")
-
-    disp     = np.zeros((n_frames, n_atoms))
-    atom_ids = None
-
-    for k, frame in enumerate(frames):
-
-        data  = frame["data"]
-        order = np.argsort(data[:, cols["id"]])
-        data  = data[order]
-
-        current_ids = data[:, cols["id"]].astype(int)
-
-        if atom_ids is None:
-            atom_ids = current_ids
-
-        elif not np.array_equal(current_ids, atom_ids):
-            raise ValueError(f"Atom IDs/order changed during trajectory {dump_path}.")
-
-        disp[k, :] = data[:, cols["c_zdisp[3]"]]
-
-    z     = disp - disp.mean(axis=0, keepdims=True)
-    fft_z = np.fft.rfft(z, axis=0)
-    power = np.abs(fft_z) ** 2
-
-    sample_dt   = 50.0e-15
-    frequencies = np.fft.rfftfreq(n_frames, d=sample_dt)
-
-    S = np.trapezoid(power, frequencies, axis=0)
-
-    return reference_xy.copy(), S, atom_ids
+    z, dt = load_displacement(dump_path)
+    
+    if len(reference_xy) != z.shape[1]:
+        raise ValueError(f"Reference coordinate count ({len(reference_xy)}) does not"
+                         f"match trajectory atom count ({z.shape[1]}) in {dump_path}")
+    
+    S, _, _ = spectral_energy(z, dt)
+    
+    return reference_xy.copy(), S, dt, z.shape[0]
 
 
 for path in (VAC_DUMP, PRISTINE_DUMP):
@@ -130,6 +83,9 @@ if len(vacancy_indices) != 1:
 vacancy_index = vacancy_indices[0]
 vx, vy        = sheet["free_xy"][vacancy_index]
 
+label = vacancy_label(sheet, VACANCY_ROW, VACANCY_COL)
+assert label == vacancy_index, "sheet is not in canonical row-major order (apply Fix 1)"
+
 print(f"Vacancy location: row={VACANCY_ROW}, col={VACANCY_COL}, x={vx:.4f} Å, y={vy:.4f} Å")
 
 amp = vibration_amplitude(VAC_DUMP, column="c_zdisp[3]")
@@ -142,16 +98,21 @@ pristine_xy = sheet["free_xy"]
 vacancy_sheet = remove_vacancy(sheet, VACANCY_ROW, VACANCY_COL)
 vacancy_xy    = vacancy_sheet["free_xy"]
 
+xy_pristine, S_pristine_raw, dt_p, nf_p = energy_map(PRISTINE_DUMP, pristine_xy)
+xy_vacancy,  S_vacancy_raw,  dt_v, nf_v = energy_map(VAC_DUMP, vacancy_xy)
 
-xy_pristine, S_pristine, pristine_ids = energy_map(PRISTINE_DUMP,pristine_xy)
-xy_vacancy, S_vacancy, vacancy_ids    = energy_map(VAC_DUMP,vacancy_xy)
+assert dt_p == dt_v and nf_p == nf_v, \
+    f"runs differ: dt {dt_p} vs {dt_v}, frames {nf_p} vs {nf_v}"
+ 
+print(f"Sampling: dt = {dt_v * 1e15:.1f} fs, {nf_v} frames")
 
-common_max = max(S_pristine.max(),S_vacancy.max())
+common_max = max(S_pristine_raw.max(),S_vacancy_raw.max())
 
-S_pristine = S_pristine / common_max
-S_vacancy  = S_vacancy / common_max
+S_pristine = S_pristine_raw / common_max
+S_vacancy  = S_vacancy_raw / common_max
 
 
+#----------------------------------------------------------------energy maps
 fig, axes = plt.subplots(1, 2, figsize=(11, 6))
 ratios    = {}
 
@@ -177,6 +138,7 @@ fig.colorbar(sc, ax=axes,label="S / S_max")
 
 output_path = RUN_DIR / "vacancy_energy_map.png"
 fig.savefig(output_path,dpi=150,bbox_inches="tight")
+plt.close(fig)
 
 
 print(f"\nEnergy near the vacancy site / sheet average "
@@ -187,26 +149,59 @@ print(f"  pristine: {ratios['Pristine']:.2f} vacancy: {ratios['Vacancy']:.2f}")
 print(f"\nSaved corrected figure:")
 print(output_path)
 
-xy, S, atom_ids = energy_map(VAC_DUMP, vacancy_xy)
 
+#------------------------------------------------------------- paired per-atom ration map
+S_vac_aligned = np.insert(S_vacancy_raw, label, np.nan)
+ratio         = S_vac_aligned / S_pristine_raw
+ 
+k_max   = int(np.nanargmax(ratio))
+d_max   = float(np.linalg.norm(pristine_xy[k_max] - np.array([vx, vy])))
+ 
+print(f"\nPaired ratio S_vacancy / S_pristine (same atom):")
+print(f"  max ratio {ratio[k_max]:.2f} at grid index {k_max} "
+      f"(row={sheet['free_row'][k_max]}, col={sheet['free_col'][k_max]}), "
+      f"{d_max:.2f} A from the vacancy site")
+print(f"  median ratio over all atoms: {np.nanmedian(ratio):.2f}")
+ 
+fig, ax = plt.subplots(figsize=(6.5, 6))
+sc = ax.scatter(pristine_xy[:, 0], pristine_xy[:, 1], c=ratio, s=40, cmap="jet",
+                vmin=0, vmax=np.nanpercentile(ratio, 99))
+ax.plot(vx, vy, "kx", ms=12, mew=2)
+ax.set_aspect("equal")
+ax.set_title("Paired ratio S_vacancy / S_pristine")
+ax.set_xlabel("X (A)")
+ax.set_ylabel("Y (A)")
+fig.colorbar(sc, ax=ax, label="ratio")
+fig.savefig(RUN_DIR / "vacancy_ratio_map.png", dpi=150, bbox_inches="tight")
+plt.close(fig)
+ 
+np.savetxt(RUN_DIR / "vacancy_ratio_722.csv",
+           np.column_stack((np.arange(1, len(ratio) + 1), ratio)),
+           delimiter=",", header="N_paper,ratio_vac_over_pristine")
+
+
+# ------------------------------------------------------------------------ 1D energy vector
+S      = S_vacancy_raw
 S_max  = S.max()
 S_norm = S / S_max
 
 n = np.arange(1, len(S_norm) + 1)
 
-vacancy_N = (19 * (VACANCY_ROW - 1)) + VACANCY_COL
+top = np.argsort(S_norm)[::-1][:6] + 1
 
-
-print(f"1D energy vector:",
-      f"Number of free atoms: {len(S_norm)}",
-      f"S_max:              : {S_max:.6e}",
-      f"Vacancy row         : {VACANCY_ROW}",
-      f"vacancy column      : {VACANCY_COL}",
-      f"Original vacancy N  : {vacancy_N}")
+print(f"\n1D energy vector:")
+print(f"  Number of free atoms : {len(S_norm)}")
+print(f"  S_max                : {S_max:.6e}")
+print(f"  Vacancy row / column : {VACANCY_ROW} / {VACANCY_COL}")
+print(f"  Vacancy label N      : {label + 1}  (vacancy sits between vector entries "
+      f"{label} and {label + 1})")
+print(f"  Top-6 vector indices : {top.tolist()}")
 
 fig, ax = plt.subplots(figsize=(7, 8))
 
 ax.plot(S_norm, n, linewidth=0.8)
+ax.axhline(label + 0.5, color="r", linestyle="--", linewidth=0.6, label="vacancy position")
+ax.legend(loc="lower right")
 
 ax.set_xlabel(r"$S/S_{\max}$", fontsize=13)
 ax.set_ylabel(r"$N$", fontsize=13)
@@ -225,5 +220,5 @@ output = np.column_stack((n, S, S_norm))
 
 np.savetxt(RUN_DIR/'vacancy_1d_S_over_Smax.csv', output, delimiter=",", header='n,S,S_over_Smax')
 
-print(f"Saved{RUN_DIR/'vacancy_1d_S_over_Smax.png'}")
-print(f"Saved{RUN_DIR/'vacancy_1d_S_over_Smax.csv'}")
+print(f"Saved {RUN_DIR/'vacancy_1d_S_over_Smax.png'}")
+print(f"Saved {RUN_DIR/'vacancy_1d_S_over_Smax.csv'}")

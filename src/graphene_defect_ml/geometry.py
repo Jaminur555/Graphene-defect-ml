@@ -1,7 +1,7 @@
 import numpy as np
 from ase.build import graphene_nanoribbon
 
-BOND_LENGTH = 1.3951 + 0.0040   # Angstrom, C-C bond length in graphene
+BOND_LENGTH = 1.3992 - 0.00024  # Angstrom, C-C bond length in graphene
 
 
 def build_graphene_sheet(n: int = 21, m: int = 23, row_border: int = 4) -> dict:
@@ -61,14 +61,26 @@ def build_graphene_sheet(n: int = 21, m: int = 23, row_border: int = 4) -> dict:
             free_col[atom_idx] = col_lookup[x[atom_idx]]
 
     fixed_mask  = ~free_mask
-    n_cols_free = int(free_col[free_mask].max() + 1)
+    
+    free_xy_  = np.column_stack((x[free_mask], y[free_mask]))
+    free_row_ = free_row[free_mask]
+    free_col_ = free_col[free_mask]
+    
+    order = np.lexsort((free_col_, free_row_))
+    
+    free_xy_, free_row_, free_col_ = free_xy_[order], free_row_[order], free_col_[order]
+    
+    n_cols_free = int(free_col.max() + 1)
     n_rows_free = len(interior_rows)
+    assert np.array_equal(free_row_ * n_cols_free + free_col_,
+                          np.arange(len(free_xy_))), "free atoms are not a full-major grid"
+    
 
     return {
         'fixed_xy': np.column_stack((x[fixed_mask], y[fixed_mask])),
-        'free_xy' : np.column_stack((x[free_mask], y[free_mask])),
-        'free_row': free_row[free_mask],
-        'free_col': free_col[free_mask],
+        'free_xy' : free_xy_,
+        'free_row': free_row_,
+        'free_col': free_col_,
         'n_rows_free': n_rows_free,
         'n_cols_free': n_cols_free
     }
@@ -134,3 +146,12 @@ def assemble_graphene(sheet: dict) -> np.ndarray:
     ))
 
     return np.vstack((free_rows, fixed_rows))
+
+def vacancy_label(sheet: dict, row: int, col: int) -> int:
+    """
+    0-based index of (row, col) on the full pristine grid (length n_rows * n_cols = 722).
+    This is the one-hot label position, The FEATURE vector (721 long) is shifted: the label 
+    is not
+    """
+    
+    return row * sheet['n_cols_free'] + col
