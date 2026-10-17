@@ -36,11 +36,12 @@ fix nvt_relax free nvt temp 300.0 300.0 0.1
 run 10000
 unfix nvt_relax
 
-#=== Stage 2: NVT vibrate, 30000 steps, dump out-of-plane displacement ====
+#=== Stage 2: NPT vibrate, 30000 steps, dump out-of-plane displacement ====
 dump vib free custom 50 vibration.lammpstrj id x y z c_zdisp[3]
 dump_modify vib sort id
 dump full_struct all custom 50 full_structure.lammpstrj id x y z
 dump_modify full_struct sort id
-fix nvt_vibrate free nvt temp 300.0 300.0 0.1
+fix npt_vibrate free npt temp 300.0 300.0 0.1 x 0.0 0.0 1.0 y 0.0 0.0 1.0 couple xy
+fix_modify npt_vibrate temp freetemp
 run 30000
-unfix nvt_vibrate
+unfix npt_vibrate

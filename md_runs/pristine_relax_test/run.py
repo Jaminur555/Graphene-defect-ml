@@ -17,7 +17,7 @@ POTENTIAL_SRC = RUN_DIR.parent.parent / "potentials" / "CH.airebo"
 POTENTIAL_DST = RUN_DIR / "CH_modified.airebo"
 
 SEED = 12345
-RELAX_STEPS = 30000  # 30 ps, vs. 10 ps in the original pristine run
+RELAX_STEPS = 20000  # 20 ps, vs. 10 ps in the original pristine run
 
 sheet = build_graphene_sheet()
 print(f"free:{sheet['free_xy'].shape[0]}, fixed: {sheet['fixed_xy'].shape[0]}")

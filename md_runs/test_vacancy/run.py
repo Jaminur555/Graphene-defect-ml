@@ -18,7 +18,7 @@ VACANCY_ROW = 17
 VACANCY_COL = 10
 SEED        = 12345
 
-ENSEMBLE = 'nvt'
+ENSEMBLE = 'npt'
 
 
 sheet     = build_graphene_sheet()
